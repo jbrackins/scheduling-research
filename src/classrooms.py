@@ -16,5 +16,7 @@ code["MCBC"] = "Chemical-Bio-Chemistry"
 code["MCM"] = "Civil-Mechanical-Engr-Bldg"
 code["MM"] = "Mc Laury Building"
 code["MNG"] = "Physical Education Center"
+code["MC1"] = "CBEC"
+#code["MC1"] = "CBEC"
 
 # add more here.
