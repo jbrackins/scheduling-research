@@ -63,7 +63,10 @@ if __name__ == "__main__":
 
     for loc, value in buildings.items():
         #print(loc)
-        print(classrooms.code[loc], "(" + loc + ")")
+        if loc in classrooms.code:
+            print(classrooms.code[loc], "(" + loc + ")")
+        else:
+            print("Unknown Location", "(" + loc + ")")
         for i, ct in value.items():
             print("\t",i, ct)
         #for room in loc.items():
