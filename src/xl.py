@@ -1,10 +1,12 @@
 from openpyxl import Workbook
 from openpyxl import load_workbook
 import matplotlib.pyplot as plt
-
+import re
 import sys
 
 import classrooms
+
+import platform
 
 courses      = {}
 rooms_used   = {}
@@ -14,6 +16,27 @@ buildings    = {}
 
 # list of rooms for a given building
 rooms        = {}
+
+
+def get_semester(filename):
+    # Determine the semester statistics (Spring/Fall) and Year
+
+    # todo: add search for summer as well
+    semester = None
+    year     = None
+
+    # find the year
+    year = re.findall(r'\d+', filename)
+    year = year[0]
+
+    # find the semester
+    if "FA" in filename:
+        semester = "Fall"
+    if "SP" in filename:
+        semester = "Spring"
+
+    return semester, year
+
 
 
 if __name__ == "__main__":
@@ -63,12 +86,34 @@ if __name__ == "__main__":
 
     for loc, value in buildings.items():
         #print(loc)
+        plot = buildings[loc]
+        sem, yr = get_semester(filename)
+        room_title = "Room Usage for "
         if loc in classrooms.code:
-            print(classrooms.code[loc], "(" + loc + ")")
+            room_title = room_title + classrooms.code[loc] + " (" + loc + ")"
         else:
-            print("Unknown Location", "(" + loc + ")")
-        for i, ct in value.items():
-            print("\t",i, ct)
+            room_title = room_title + " (" + loc + ")"
+        room_title = room_title + " - " + sem + " " + yr
+        plt.figure(figsize=(20,10))
+
+        plt.title(room_title)
+        plt.xlabel('Room')
+        plt.ylabel('Number of Courses Using Room')
+        plt.bar(range(len(plot)), plot.values(), align='center')
+        plt.xticks(range(len(plot)), list(plot.keys()))
+        #plt.show()
+
+        plt_file = loc + "_" + yr + "_" + sem
+        print(plt_file)
+        plt.savefig(plt_file, format='pdf', bbox_inches='tight')
+        plt.clf()
+        #print(buildings[loc])
+        #if loc in classrooms.code:
+        #    print(classrooms.code[loc], "(" + loc + ")")
+        #else:
+        #    print("Unknown Location", "(" + loc + ")")
+        #for i, ct in value.items():
+        #    print("\t",i, ct)
         #for room in loc.items():
         #    print(room)
 
