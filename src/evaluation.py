@@ -24,7 +24,22 @@ class ScheduleEvaluation:
         self.hourly_counts = {"M": {}, "T": {}, "W": {}, "R": {}, "F": {} ,"S": {}}
         self.hourly_counts = collections.OrderedDict(self.hourly_counts)
 
-        self.room_total = 0
+        self.hourly_total = {"M": {}, "T": {}, "W": {}, "R": {}, "F": {} ,"S": {}}
+
+        self.hourly_min   = {"M": {}, "T": {}, "W": {}, "R": {}, "F": {} ,"S": {}}
+        self.hourly_min = collections.OrderedDict(self.hourly_min)
+
+        self.hourly_max   = {"M": {}, "T": {}, "W": {}, "R": {}, "F": {} ,"S": {}}
+        self.hourly_max = collections.OrderedDict(self.hourly_max)
+
+        self.set_min_max()
+        self.room_total   = 0
+
+    def set_min_max(self):
+        for day in ["M", "T", "W", "R", "F", "S"]:
+            self.hourly_total    =  0
+            self.hourly_min[day] =  10000
+            self.hourly_max[day] = -10000
 
     def valid(self, course):
         """Validate course to determine if we care about it.
@@ -60,6 +75,28 @@ class ScheduleEvaluation:
             return True
         return False
 
+    def in_location_list(self,course,loc_list):
+        """Validate course to determine if we care about it.
+
+            We care about courses in this criteria:
+            1) In a specific room
+        """
+        course_location = self.get_course_location(course)
+        if course_location in loc_list:
+            return True
+        return False
+
+    def in_room_size(self,course,score,size):
+        """Validate course to determine if we care about it.
+
+            We care about courses in this criteria:
+            1) In a specific room size tier (S,M,L)
+        """
+        course_size = score.get_room_size_tier(course)
+        if course_size == size:
+            return True
+        return False
+
     def on_date(self,course,date):
         """Validate course to determine if we care about it.
 
@@ -90,6 +127,14 @@ class ScheduleEvaluation:
     def get_course_location(self,course):
         return str( course.rec["BUILDING"] ) + " " + str( course.rec["ROOM"] )
 
+    def find_record(self, location, time):
+        for course,score in self.records:
+            loc = self.get_course_location(course)
+            hr  = course.rec["START_TIME"]
+            if location == loc and time == hr:
+                return course
+        return None
+
     def calc_data(self):
         """Perform evaluation calcs
         """
@@ -114,14 +159,21 @@ class ScheduleEvaluation:
     def count_hourly_usage(self, course):
         course_days = course.rec["DAYS_OF_WEEK"]
         start_time  = course.rec["START_TIME"]
+
+
         for day in ["M", "T", "W", "R", "F", "S"]:
             if day in course_days:
                 # Course occurs on given day, add it's course time to our record
                 if start_time in self.hourly_counts[day]:
-                    self.hourly_counts[day][start_time] = self.hourly_counts[day][start_time] + 1
+                    self.hourly_counts[day][start_time] += 1
                 else:
                     self.hourly_counts[day][start_time] = 1
+                #self.hourly_total[day] += 1
+                value = self.hourly_counts[day][start_time]
 
+                # update min and max for this day if need be
+                self.hourly_min[day], self.hourly_max[day] = self.check_min_max(self.hourly_min[day], self.hourly_max[day],value)
+                
     def count_rooms(self, location):
         """Build Room Dictionary
         """
@@ -204,19 +256,59 @@ class ScheduleEvaluation:
 
     def get_courses_in_location(self, location):
         return [ [course, score] for course, score in self.records if self.in_location(course, location)]
-    
+ 
+    def get_courses_in_location_list(self, loc_list):
+        return [ [course, score] for course, score in self.records if self.in_location_list(course, loc_list)]
+
     def get_courses_on_date(self, date):
         return [ [course, score] for course, score in self.records if self.on_date(course, date)]
+
+    def get_courses_in_room_size(self, size):
+        size = size.upper()
+        if size == "LARGE":
+            size = "L"
+        elif size == "MEDIUM":
+            size = "M"
+        elif size == "SMALL":
+            size = "S"
+        return [ [course, score] for course, score in self.records if self.in_room_size(course, score, size)]
 
     def count_records(self):
         return len(self.records)
 
+    def get_records(self):
+        return self.records
+
     def score_records(self):
         for rec,score in self.records:
             score.get_room_size_tier(rec)
+            score.get_section_size_tier(rec)
             score.get_percentage_score(rec)
-            score.get_hourly_score(rec,self.hourly_counts)
+            score.get_hourly_score(rec,self.hourly_counts,self.hourly_total, self.hourly_min, self.hourly_max)
+            score.get_size_tier_score(rec)
+            score.get_weighted_score(rec)
 
+    def check_min_max(self,current_min,current_max,value):
+
+        #check min
+        if current_min > value:
+            current_min = value
+        #check max
+        if current_max < value:
+            current_max = value
+
+        return current_min, current_max
+
+    def find_min_max(self,course_list):
+        # get first value to set as minimum
+        for course in course_list:
+            #minimum = course.
+            break
+
+        for course in course_list:
+            break
+
+        return minimum, maximum
     def get_military_time(self,time):
         """get correct time format
         """

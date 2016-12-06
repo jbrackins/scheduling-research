@@ -37,6 +37,7 @@ class CourseRecord:
         self.init_rec(self.rec, self.keys)
 
     def init_keys(self, keyring):
+        keyring.append(self.course_key)             
         keyring.append(self.subject_key)
         keyring.append(self.course_number_key)      
         keyring.append(self.status_key)             
@@ -47,9 +48,10 @@ class CourseRecord:
         keyring.append(self.section_capacity_key) 
         keyring.append(self.building_key) 
         keyring.append(self.room_key)               
-        keyring.append(self.course_key)             
         keyring.append(self.student_count_key)    
 
+    def __repr__(self):
+        return self.rec
 
     def __str__(self):
         msg = ""
