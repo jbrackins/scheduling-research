@@ -29,3 +29,5 @@ class SpreadsheetIndex:
         self.room               = "AD"
         self.course             = "I"
         self.student_count      = "M"
+        self.course_cross_ref   = "Z"
+        self.course_flag        = "AA"

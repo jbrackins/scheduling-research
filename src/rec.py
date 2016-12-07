@@ -32,6 +32,8 @@ class CourseRecord:
         self.room_key               = ["ROOM", self.i.room]
         self.course_key             = ["COURSE", self.i.course]
         self.student_count_key      = ["STUDENT_COUNT", self.i.student_count]
+        self.course_cross_ref_key   = ["CROSS_LIST", self.i.course_cross_ref]
+        self.course_flag_key        = ["PRIMARY", self.i.course_cross_ref]
 
         self.init_keys(self.keys)
         self.init_rec(self.rec, self.keys)
@@ -49,6 +51,8 @@ class CourseRecord:
         keyring.append(self.building_key) 
         keyring.append(self.room_key)               
         keyring.append(self.student_count_key)    
+        keyring.append(self.course_cross_ref_key)    
+        keyring.append(self.course_flag_key)    
 
     def __repr__(self):
         return self.rec

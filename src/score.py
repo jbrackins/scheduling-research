@@ -35,9 +35,13 @@ class RoomScore:
         # number of hours room is used
         # with additional weight given to important times
 
+        self.course                = None
+        self.student_count         = 0
+        self.section_size          = 0
         self.percentage_score      = 0    # 0% - 100% room usage
         self.room_size_tier        = 'S'  # S / M / L
         self.section_size_tier     = 'S'  # S / M / L
+        self.student_count_tier    = 'S'
         self.hourly_score          = {"M": {}, "T": {}, "W": {}, "R": {}, "F": {} ,"S": {}}   # how many hours room is used
         self.size_tier_score       = 0    # does the room size make sense
         self.calculated            = False
@@ -58,6 +62,11 @@ class RoomScore:
     def foo(self):
         print("")
 
+    def get_room_stats(self,course):
+        self.course = course.rec["COURSE"]
+        self.student_count = course.rec["STUDENT_COUNT"] 
+        self.section_size = course.rec["SECTION_CAPACITY"]
+              
     def get_room_size_tier(self,course):
         size = course.rec["ROOM_CAPACITY"]
         if size > 60:
@@ -68,16 +77,27 @@ class RoomScore:
             self.room_size_tier = "S" # Small Room
         return self.room_size_tier
 
+    def get_student_count_tier(self,course):
+        size = course.rec["STUDENT_COUNT"]
+        if size == None:
+            size = 0
+        if size > LARGE_ROOM_TIER:
+            self.student_count_tier = "L" # Large student count
+        elif size > MEDIUM_ROOM_TIER:
+            self.student_count_tier = "M" # Medium student count
+        else:
+            self.student_count_tier = "S" # Small student count
+
     def get_section_size_tier(self,course):
         size = course.rec["SECTION_CAPACITY"]
         if size == None:
             size = course.rec["STUDENT_COUNT"]
         if size > LARGE_ROOM_TIER:
-            self.section_size_tier = "L" # Large student count
+            self.section_size_tier = "L" # Large section
         elif size > MEDIUM_ROOM_TIER:
-            self.section_size_tier = "M" # Medium student count
+            self.section_size_tier = "M" # Medium section
         else:
-            self.section_size_tier = "S" # Small student count
+            self.section_size_tier = "S" # Small section
 
     def get_size_tier_score(self,course):
         self.size_tier_score = self.check_size_tier(course)
@@ -144,6 +164,8 @@ class RoomScore:
             room_size    = self.room_size_tier
             tier_max     = 1.00
             course_days = course.rec["DAYS_OF_WEEK"]
+
+            cross_ref   = course.rec["CROSS_LIST"] # check if course is cross-listed
             # adjust worth of percentage
             percentage = self.percentage_score
             if room_size == "L" and section_size == "L":
@@ -154,16 +176,21 @@ class RoomScore:
                 percentage -= (tier_max-percentage) * 0.20 # 20% Reduction
             elif room_size == section_size:
                 # If room size and section size are identical (not Large), then bump up percentage a bit
-                percentage += (tier_max-percentage) * 0.75 # 80% Boost
+                percentage += (tier_max-percentage) * 0.50 # 80% Boost
             else:
                 # Bump up the percentage regardless, since room percentage can be way lower than other stats
-                percentage += (tier_max-percentage) * 0.50 # 50% Boost
+                percentage += (tier_max-percentage) * 0.20 # 20% Boost
 
             # compile the hourly scores
-            for day in ["M", "T", "W", "R", "F", "S"]:
-                if day in course_days:
-                    hourly *= self.hourly_score[day]
-            score = self.size_tier_score * 1 * percentage
+            #for day in ["M", "T", "W", "R", "F", "S"]:
+            #    if day in course_days:
+            #        hourly *= self.hourly_score[day]
+
+            score = self.size_tier_score * percentage
+            if cross_ref != None:
+                #increase the score if this is a cross listed course
+                score *= 2.00
+
             self.weighted_score = score
             self.calculated = True
         return self.weighted_score
@@ -178,6 +205,9 @@ class RoomScore:
 
         section = self.tier_to_value(self.section_size_tier)
         room    = self.tier_to_value(self.room_size_tier)
+        count   = self.tier_to_value(self.student_count_tier)
+        
+        tier_max = 1.00
 
         # If room and section are identical tiers, perfect score
         score = 1.00
@@ -185,10 +215,27 @@ class RoomScore:
             # Room is too small
             for i in range(room,section):
                 score = score * ( i / pow( section,1.5) )
+        if room == section:
+            # Room is same size
+            score = 1.00
         else:
             # Room is too large
             for i in range(section,room):
                 score = score * ( i / pow(room,1) )
+        
+        if count > section and room < LARGE:
+            # Student counts exceeded. Room is penalized for being too small
+            score -= (tier_max-score) * 0.20 # 20% Penalty
+        elif count > section and room == LARGE:
+            # Student counts exceeded. Small penalization... There aren't many 
+            # Other rooms that will hold this class...
+            score -= (tier_max-score) * 0.05 #  5% Penalty
+        elif count < section:
+            # Course did not meet signup expectations, penalty
+            score -= (tier_max-score) * 0.15 # 15% Penalty
+        elif count == section:
+            # Course met section size expectations, boost
+            score += (tier_max-score) * 0.75 # 75% Boost
         return score
 
 

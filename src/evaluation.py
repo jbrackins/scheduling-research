@@ -127,7 +127,7 @@ class ScheduleEvaluation:
     def get_course_location(self,course):
         return str( course.rec["BUILDING"] ) + " " + str( course.rec["ROOM"] )
 
-    def find_record(self, location, time):
+    def find_course(self, location, time):
         for course,score in self.records:
             loc = self.get_course_location(course)
             hr  = course.rec["START_TIME"]
@@ -281,10 +281,13 @@ class ScheduleEvaluation:
 
     def score_records(self):
         for rec,score in self.records:
+            score.get_room_stats(rec)
             score.get_room_size_tier(rec)
             score.get_section_size_tier(rec)
+            score.get_student_count_tier(rec)
+
             score.get_percentage_score(rec)
-            score.get_hourly_score(rec,self.hourly_counts,self.hourly_total, self.hourly_min, self.hourly_max)
+            #score.get_hourly_score(rec,self.hourly_counts,self.hourly_total, self.hourly_min, self.hourly_max)
             score.get_size_tier_score(rec)
             score.get_weighted_score(rec)
 

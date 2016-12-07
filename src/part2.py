@@ -45,73 +45,44 @@ if __name__ == "__main__":
         filename =  sys.argv[1] 
         wb = load_workbook(filename)
         ws = wb.active
-        for i in range(2, len(ws.rows)):
+        for i in range(2, len(ws.rows)+1): #needs +1 because apparently last entry is left off otherwise
             s = RoomScore()
             r = CourseRecord()
             r.read_rec(ws,i)
             records.append([r,s])
         semester, year = get_semester(filename)
 
+    if(len(sys.argv) > 2):
+        class_rooms = sys.argv[2]
+    else:
+        class_rooms = "all"
+
+    # Any room with a rank > threshold has a good score
+    good_threshold = 5.00 
+
+    bad_scores  = collections.defaultdict(dict)
+    good_scores = collections.defaultdict(dict)
+
+    print("Evaluation of", semester, year,":")
     e = ScheduleEvaluation(records)
 
-
-    print(e.count_records(), "Records")
+    # remove all unimportant rooms
     e.prune_records()
-    print(e.count_records(), "Records after Pruning")
-
     e.calc_data()
+
+    # score all rooms
     e.score_records()
-    #e.print_records()
-    #e.print_hourly_usage()
 
-    #mondays = e.get_courses_on_date("Monday")
-
-    #eMondays = ScheduleEvaluation(mondays)
-    #eMondays.print_records(True,True)
-    #e.print_rooms("MCM")
-
-    #buildings = e.get_buildings()
-
-    l = Classrooms("large")
-    print("Big ol rooms")
+    # reduce to only large rooms
+    l = Classrooms(class_rooms)
     large = e.get_courses_in_location_list(l.get_rooms())
     large = ScheduleEvaluation(large)
-    #large.print_records(True,True)
 
-    i = 0
 
+    # Build a dictionary of all rooms that are relevant
+    # This dict will contain score information for every course
+    # related to a given room, which are all added together.
     room_dict = {}
-
-    # # UGH do this the other way around........
-    # for day in ["M", "T", "W", "R", "F", "S"]:
-    #     day_data = large.get_courses_on_date(day)
-    #     day_data = ScheduleEvaluation(day_data)
-    #     #day_data.print_records(True,True)
-
-    #     for room in l.get_rooms():
-    #         room_data       = day_data.get_courses_in_location(room)
-    #         room_data       = ScheduleEvaluation(room_data)
-    #         room_dict[room] = LocationScore(room_data)
-
-    #         print("ROOOM",room)
-    #         if len(room_dict[room].get_evals().get_records()) > 1:
-
-    #             # go to first value and extract the room capacity
-    #             for course,score in room_data.get_records():
-    #                 capacity = course.rec["ROOM_CAPACITY"]
-    #                 break
-    #             day_plot = ScheduleReport(year, semester, room_dict[room].get_evals(), "Course Time", "Percentage of Room Filled")
-    #             day_plot.plot_seat_percentage(room,day,capacity,i)
-    #             #room_data.print_records(True,True)
-    #             print("DONE=====================")
-    #         else:
-    #             print("OOPS")
-    #     i += 1
-
-
-    # For every room, generate a plot for each day
-    #   (two for loops)
-
     for room in l.get_rooms():
         room_data       = large.get_courses_in_location(room)
 
@@ -120,37 +91,65 @@ if __name__ == "__main__":
             room_data       = ScheduleEvaluation(room_data)
             room_dict[room] = LocationScore(room_data)
 
-            print("Score for ", room_dict[room].get_location(), room_dict[room].get_final_weighted_score())
-            i = 0
-            for day in ["M", "T", "W", "R", "F", "S"]:
-                day_data = room_dict[room].get_evals().get_courses_on_date(day)
-                day_data = ScheduleEvaluation(day_data)
+    mini =  10000
+    maxi = -10000
+    # Normalize weights
+    for room in room_dict:
+        # Plot all room analysis
+        final_score = room_dict[room].get_final_weighted_score()    
 
-                # Only generate if the room actually has any classes that day
-                if len(day_data.get_records()) > 1:
-
-                    # go to first value and extract the room capacity
-                    for course,score in day_data.get_records():
-                        capacity = course.rec["ROOM_CAPACITY"]
-                        break
-                    day_plot = ScheduleReport(year, semester, day_data, "Course Time", "Percentage of Room Filled")
-                    day_plot.plot_seat_percentage(room,day,capacity,i)
-                    #room_data.print_records(True,True)
-                else:
-                    continue
-                i += 1
-
-    #percent_plots
-    # print("--------------------------------------------------------")
-    # for building in sorted(buildings):
-    #     print("Stats for", building)
-    #     e.print_rooms(building)
-    #     print("--------------------------------------------------------")
-
-    # print("Stats for all buildings")
-    # e.print_buildings()
-    # print("--------------------------------------------------------")
+        if mini > final_score:
+            mini = final_score
+        if maxi < final_score:
+            maxi = final_score
 
 
-    # print("min", e.hourly_min, "max", e.hourly_max)
+    # perform analysis on interested rooms
+    for room in room_dict:
+        #before = room_dict[room].get_final_weighted_score()
+        room_dict[room].normalize_final_weighted_score(mini,maxi)
+
+        # Plot all room analysis
+        final_score = room_dict[room].get_final_weighted_score()
+        rank = float(room_dict[room].get_score_rank())
+        #print(room_dict[room].get_location(),"SCORE:",final_score,"RANK:",rank)
+        
+        loc   = room_dict[room].get_location()
+        rnk  = "rank"
+        scr = "score"
+        if rank >= good_threshold:
+            good_scores[loc][rnk]  = rank
+            good_scores[loc][scr] = final_score
+        else:
+            bad_scores[loc][rnk]  = rank
+            bad_scores[loc][scr] = final_score
+
+        i = 0
+        
+        for day in ["M", "T", "W", "R", "F", "S"]:
+            day_data = room_dict[room].get_evals().get_courses_on_date(day)
+            day_data = ScheduleEvaluation(day_data)
+            #day_data.print_hourly_usage()
+            # Only generate if the room actually has any classes that day
+            if len(day_data.get_records()) > 1:
+
+                # go to first value and extract the room capacity
+                for course,score in day_data.get_records():
+                    capacity = course.rec["ROOM_CAPACITY"]
+                    break
+                day_plot = ScheduleReport(year, semester, day_data, "Course Time", "Percentage of Room Filled")
+                ind   = "{0:.2f}".format(room_dict[room].get_daily_weight(day) )
+                total = "{0:.2f}".format(final_score)
+                day_plot.plot_seat_percentage(room,day,capacity,ind,total,rank,i,class_rooms)
+                #room_data.print_records(True,True)
+            else:
+                continue
+            i += 1
+
+    day_plot.generate_report(good_scores,bad_scores,class_rooms,good_threshold)
+
+    print("Evaluation Complete")
+
+
+
 
